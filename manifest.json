@@ -1,0 +1,18 @@
+{
+  "theme_color": "#121212",
+  "background_color": "#121212",
+  "display": "standalone",
+  "scope": "/Tagebuch/",
+  "start_url": "/Tagebuch/index.html",
+  "name": "Tagebuch",
+  "short_name": "Tagebuch",
+  "description": "Minimalistisches persönliches Tagebuch im Homescreen-Design",
+  "icons": [
+    {
+      "src": "logo.jpg",
+      "sizes": "350x350",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
