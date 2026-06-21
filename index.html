@@ -551,21 +551,12 @@
             }
         }
 
-        // SERVICE WORKER FÜR ECHTE OFFLINE-UNTERSTÜTZUNG (WICHTIG FÜR PWA BUILDER)
+        // DER NEUE, REINE REGISTRIERUNGS-CODE FÜR DIE SEPARATE SW.JS DATEI
         document.addEventListener("DOMContentLoaded", () => {
             if(window.location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-                const swCode = `
-                    const CACHE_NAME = 'tagebuch-v1';
-                    self.addEventListener('install', e => {
-                        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['index.html', 'manifest.json'])));
-                    });
-                    self.addEventListener('fetch', e => {
-                        e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
-                    });
-                `;
-                const swBlob = new Blob([swCode], {type: 'application/javascript'});
-                const swUrl = URL.createObjectURL(swBlob);
-                navigator.serviceWorker.register(swUrl).catch(() => {});
+                navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("Service Worker registriert!"))
+                .catch(err => console.log("Fehler beim SW Registrieren:", err));
             }
         });
 
