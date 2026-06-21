@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tagebuch</title>
+    
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Browser-Tab-Icon -->
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+
+    <!-- iOS ignoriert teilweise das Manifest-Icon -> eigenes Meta-Tag nötig -->
+    <link rel="apple-touch-icon" href="logo.jpg">
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tagebuch">
+    <meta name="theme-color" content="#121212">
+    
+    <style>
+        /* HOMESCREEN FARBTHEMA (DARK DESIGN COPIED FROM SCREENSHOT) */
+        :root {
+            --bg-color: #121212;               /* Tiefschwarz */
+            --surface-color: #1e1e1e;          /* Dunkelgrau für Karten */
+            --text-color: #ffffff;             /* Reines Weiß für primären Text */
+            --text-secondary: #aaaaaa;         /* Soft-Grau für Beschriftungen */
+            --primary-color: #ffffff;          /* Weißer Akzent */
+            --border-color: #2c2c2c;           /* Dezente Trennlinien */
+            
+            /* Statusfarben angepasst an den Sekundenzeiger & Homescreen-Vibe */
+            --success-color: #00e676;          /* Minimalistisches, klares Grün */
+            --success-container: rgba(0, 230, 118, 0.15);
+            --error-color: #d32f2f;            /* Exakter Rot-Ton des Sekundenzeigers */
+            --error-container: rgba(211, 47, 47, 0.2);
+            --empty-day-bg: #262626;           /* Unausgefüllte Tage */
+        }
+
+        /* BASIS STYLES */
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            padding-bottom: 40px; 
+        }
+
+        /* HEADER & NAVIGATION */
+        header { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 18px 16px; 
+            background-color: var(--surface-color); 
+            border-bottom: 1px solid var(--border-color); 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+        }
+        .menu-btn { 
+            background: none; 
+            border: none; 
+            cursor: pointer; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-around; 
+            width: 22px; 
+            height: 16px; 
+        }
+        .menu-btn span { 
+            width: 100%; 
+            height: 2px; 
+            background-color: var(--text-color); 
+            border-radius: 2px; 
+        }
+        
+        nav { 
+            display: none; 
+            position: absolute; 
+            top: 100%; 
+            left: 0; 
+            width: 100%; 
+            background-color: var(--surface-color); 
+            border-bottom: 1px solid var(--border-color); 
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4); 
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        nav.active { 
+            display: block; 
+            opacity: 1;
+            transform: translateY(0);
+        }
+        nav ul { list-style: none; }
+        nav li { 
+            padding: 16px; 
+            border-bottom: 1px solid var(--border-color); 
+            font-weight: 500; 
+            font-size: 16px; 
+            cursor: pointer; 
+        }
+        nav li:active { background-color: var(--bg-color); }
+
+        /* TOAST BENACHRICHTIGUNG */
+        .toast { 
+            position: fixed; 
+            bottom: 25px; 
+            left: 50%; 
+            transform: translateX(-50%) translateY(100px); 
+            background-color: #333333; 
+            color: #ffffff; 
+            padding: 14px 28px; 
+            border-radius: 100px; 
+            font-size: 14px; 
+            font-weight: 500; 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5); 
+            z-index: 1000; 
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease; 
+            opacity: 0; 
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { background-color: var(--success-color); color: #000000; font-weight: 600; }
+
+        /* ANIMIERTE TABS (FADE-IN EFFEKT) */
+        .tab-content { 
+            display: none; 
+            padding: 16px; 
+            max-width: 500px; 
+            margin: 0 auto; 
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .tab-content.active { 
+            display: block; 
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .card { 
+            background-color: var(--surface-color); 
+            padding: 24px; 
+            border-radius: 20px; 
+            border: 1px solid var(--border-color); 
+            margin-bottom: 16px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        h2 { font-size: 20px; margin-bottom: 20px; font-weight: 600; color: var(--text-color); }
+
+        /* FORMULARELEMENTE UI & EFFEKTE */
+        .form-group { margin-bottom: 18px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+        label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        input, select, textarea { 
+            width: 100%; 
+            padding: 14px; 
+            background-color: var(--bg-color); 
+            border: 1px solid var(--border-color); 
+            border-radius: 12px; 
+            color: var(--text-color); 
+            font-size: 16px; 
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #ffffff;
+        }
+        textarea { resize: none; }
+        
+        button.btn-primary { 
+            width: 100%; 
+            background-color: var(--primary-color); 
+            color: #000000; 
+            border: none; 
+            padding: 16px; 
+            border-radius: 14px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            margin-top: 10px; 
+        }
+        button.btn-primary:active { 
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+
+        /* WEICHER COLLAPSE-EFFEKT FÜR DIE SUCHT-OPTION */
+        #resistedGroup {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.3s ease, opacity 0.3s ease, margin-bottom 0.3s ease;
+        }
+        #resistedGroup.visible {
+            max-height: 100px;
+            opacity: 1;
+            margin-bottom: 18px;
+        }
+
+        /* HOMESCREEN KALENDER DESIGN */
+        .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .calendar-header button { background: none; border: none; font-size: 22px; color: var(--text-color); padding: 8px 16px; cursor: pointer; }
+        .month-title { font-weight: 600; font-size: 18px; letter-spacing: 0.5px; }
+        
+        .weekdays-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; text-transform: uppercase; }
+        
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+        .day-cell { 
+            aspect-ratio: 1; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border-radius: 50%; 
+            font-size: 14px; 
+            color: var(--text-color); 
+            position: relative; 
+            cursor: pointer; 
+            background-color: var(--empty-day-bg); 
+        }
+        .day-cell.empty { cursor: default; background: none; }
+        .day-cell:not(.empty):active {
+            transform: scale(0.85);
+        }
+        
+        /* THEME-FARBEN AUS DEM SCREENSHOT */
+        .day-cell.status-good { background-color: var(--success-container); color: var(--success-color); font-weight: bold; }
+        .day-cell.status-bad { background-color: var(--error-container); color: var(--error-color); font-weight: bold; }
+        .day-cell.today { border: 2px solid #ffffff; }
+
+        /* DETAIL ANSICHT UI */
+        .detail-item { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
+        .detail-item:last-child { border-bottom: none; }
+        .detail-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .detail-value { font-size: 16px; font-weight: 600; }
+        .notes-value { font-size: 15px; font-weight: normal; font-style: italic; line-height: 1.5; white-space: pre-wrap; margin-top: 6px; color: #dddddd; }
+        .empty-state { text-align: center; color: var(--text-secondary); padding: 40px 20px; font-style: italic; }
+        
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+        .badge.good { background-color: var(--success-container); color: var(--success-color); }
+        .badge.bad { background-color: var(--error-container); color: var(--error-color); }
+        .sub-value { font-size: 13px; color: var(--text-secondary); font-weight: normal; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="menu-btn" onclick="toggleMenu()">
+            <span></span>
+            <span style="margin: 4px 0;"></span>
+            <span></span>
+        </div>
+        <div style="font-weight: 600; font-size: 19px; letter-spacing: 0.5px;">Tagebuch</div>
+        <div style="width: 22px;"></div>
+        <nav id="mainNav">
+            <ul>
+                <li onclick="navigateToTab('formTab')">Neuer Eintrag</li>
+                <li onclick="navigateToTab('calendarTab')">Kalender</li>
+                <li onclick="navigateToTab('viewTab')">Eintragung anzeigen</li>
+            </ul>
+        </nav>
+    </header>
+
+    <div id="toastNotification" class="toast"></div>
+
+    <main id="formTab" class="tab-content active">
+        <div class="card">
+            <h2>Eintrag verfassen</h2>
+            <div class="form-group">
+                <label for="dateSelect">Datum</label>
+                <input type="date" id="dateSelect">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="screenTimeHandy">Handy (Std.)</label>
+                    <input type="number" id="screenTimeHandy" step="0.5" inputmode="decimal" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label for="screenTimeLaptop">Laptop (Std.)</label>
+                    <input type="number" id="screenTimeLaptop" step="0.5" inputmode="decimal" placeholder="0">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="unnecessaryScreen">Unproduktiv?</label>
+                <select id="unnecessaryScreen">
+                    <option value="Nein">Nein</option>
+                    <option value="Ja">Ja</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="suchtGespueret">Sucht gespürt?</label>
+                <select id="suchtGespueret" onchange="toggleResistedField()">
+                    <option value="Nein">Nein</option>
+                    <option value="Ja">Ja</option>
+                </select>
+            </div>
+            
+            <div id="resistedGroup">
+                <label for="resisted">Sucht widerstanden?</label>
+                <select id="resisted">
+                    <option value="Ja">Ja</option>
+                    <option value="Nein">Nein</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="notes">Präsenz im Haus / Notizen</label>
+                <textarea id="notes" rows="3" placeholder="Notizen hier eintragen..."></textarea>
+            </div>
+            <button class="btn-primary" onclick="saveEntry()">Eintrag speichern</button>
+        </div>
+    </main>
+
+    <main id="calendarTab" class="tab-content">
+        <div class="card">
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)">&lsaquo;</button>
+                <div class="month-title" id="monthTitle">Monat Jahr</div>
+                <button onclick="changeMonth(1)">&rsaquo;</button>
+            </div>
+            <div class="weekdays-grid">
+                <div>Mo</div><div>Di</div><div>Mi</div><div>Do</div><div>Fr</div><div>Sa</div><div>So</div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+    </main>
+
+    <main id="viewTab" class="tab-content">
+        <div class="card" id="detailCard">
+            <div class="empty-state" id="emptyStateMessage">
+                Bitte wähle zuerst einen Tag im Kalender aus.
+            </div>
+            <div id="detailContent" style="display: none;">
+                <h2 id="viewDate" style="color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-bottom: 20px;">Eintrag vom ...</h2>
+                
+                <div class="detail-item">
+                    <div class="detail-label">Bildschirmzeit gesamt</div>
+                    <div class="detail-value" id="viewScreenTimeContainer">
+                        <span id="viewScreenTime"></span> Stunden
+                    </div>
+                    <div class="sub-value" id="viewScreenTimeSplit">Handy: - | Laptop: -</div>
+                </div>
+                
+                <div class="detail-item">
+                    <div class="detail-label">Unproduktiv</div>
+                    <div class="detail-value" id="viewUnnecessary"></div>
+                </div>
+                
+                <div class="detail-item">
+                    <div class="detail-label">Sucht gespürt</div>
+                    <div class="detail-value" id="viewWave"></div>
+                </div>
+                
+                <div class="detail-item">
+                    <div class="detail-label">Sucht widerstanden</div>
+                    <div class="detail-value" id="viewResisted"></div>
+                </div>
+                
+                <div class="detail-item">
+                    <div class="detail-label">Präsenz im Haus / Notizen</div>
+                    <div class="notes-value" id="viewNotes"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentCalendarDate = new Date();
+        let selectedDateStr = null;
+        let isHandlingPopState = false;
+
+        document.getElementById('dateSelect').value = new Date().toISOString().split('T')[0];
+
+        window.replaceState ? window.history.replaceState({tab: 'formTab'}, '') : null;
+
+        window.onpopstate = function(event) {
+            if (event.state && event.state.tab) {
+                isHandlingPopState = true;
+                switchTab(event.state.tab);
+                isHandlingPopState = false;
+            }
+        };
+
+        function toggleMenu() {
+            const nav = document.getElementById('mainNav');
+            if (nav.classList.contains('active')) {
+                nav.style.opacity = '0';
+                nav.style.transform = 'translateY(-10px)';
+                setTimeout(() => nav.classList.remove('active'), 300);
+            } else {
+                nav.classList.add('active');
+                setTimeout(() => {
+                    nav.style.opacity = '1';
+                    nav.style.transform = 'translateY(0)';
+                }, 10);
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toastNotification');
+            toast.innerText = message;
+            toast.className = `toast show ${type}`;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function navigateToTab(tabId) {
+            if (!isHandlingPopState) {
+                window.history.pushState({tab: tabId}, '');
+            }
+            switchTab(tabId);
+        }
+
+        function switchTab(tabId) {
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            const activeTab = document.getElementById(tabId);
+            activeTab.classList.add('active');
+            
+            const nav = document.getElementById('mainNav');
+            nav.classList.remove('active');
+            nav.style.opacity = '0';
+            
+            if (tabId === 'calendarTab') {
+                renderCalendar();
+            }
+            if (tabId === 'viewTab' && selectedDateStr) {
+                loadDetailView(selectedDateStr);
+            }
+        }
+
+        function toggleResistedField() {
+            const suchtGespuestVal = document.getElementById('suchtGespueret').value;
+            const group = document.getElementById('resistedGroup');
+            if (suchtGespuestVal === 'Ja') {
+                group.classList.add('visible');
+            } else {
+                group.classList.remove('visible');
+            }
+        }
+
+        function saveEntry() {
+            const date = document.getElementById('dateSelect').value;
+            if (!date) {
+                showToast("Bitte Datum wählen.", "error");
+                return;
+            }
+
+            const suchtGespuestVal = document.getElementById('suchtGespueret').value;
+            const handyTime = document.getElementById('screenTimeHandy').value || "0";
+            const laptopTime = document.getElementById('screenTimeLaptop').value || "0";
+
+            const data = {
+                handyTime: handyTime,
+                laptopTime: laptopTime,
+                unnecessaryScreen: document.getElementById('unnecessaryScreen').value,
+                waveOccurred: suchtGespuestVal,
+                resisted: suchtGespuestVal === 'Ja' ? document.getElementById('resisted').value : "Keine Sucht",
+                notes: document.getElementById('notes').value
+            };
+
+            localStorage.setItem('diary_' + date, JSON.stringify(data));
+            showToast("Eintrag erfolgreich gespeichert!", "success");
+            
+            document.getElementById('screenTimeHandy').value = '';
+            document.getElementById('screenTimeLaptop').value = '';
+            document.getElementById('notes').value = '';
+            document.getElementById('suchtGespueret').value = 'Nein';
+            toggleResistedField();
+            
+            setTimeout(() => {
+                navigateToTab('calendarTab');
+            }, 400);
+        }
+
+        function changeMonth(direction) {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() + direction);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            const title = document.getElementById('monthTitle');
+            grid.innerHTML = '';
+
+            const year = currentCalendarDate.getFullYear();
+            const month = currentCalendarDate.getMonth();
+
+            const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+            title.innerText = monthNames[month] + " " + year;
+
+            let firstDayIndex = new Date(year, month, 1).getDay() - 1;
+            if (firstDayIndex === -1) firstDayIndex = 6; 
+
+            const totalDays = new Date(year, month + 1, 0).getDate();
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            for (let i = 0; i < firstDayIndex; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'day-cell empty';
+                grid.appendChild(emptyCell);
+            }
+
+            for (let day = 1; day <= totalDays; day++) {
+                const cell = document.createElement('div');
+                cell.className = 'day-cell';
+                cell.innerText = day;
+
+                const currentStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+                if (currentStr === todayStr) {
+                    cell.classList.add('today');
+                }
+
+                const entryStr = localStorage.getItem('diary_' + currentStr);
+                if (entryStr) {
+                    const entry = JSON.parse(entryStr);
+                    const handy = parseFloat(entry.handyTime || entry.screenTime || 0);
+                    const laptop = parseFloat(entry.laptopTime || 0);
+                    const totalTime = handy + laptop;
+
+                    const isTimeBad = totalTime > 3;
+                    const isUnproductive = entry.unnecessaryScreen === 'Ja';
+                    const isSuchtMisslungen = entry.waveOccurred === 'Ja' && entry.resisted === 'Nein';
+
+                    if (isTimeBad || isUnproductive || isSuchtMisslungen) {
+                        cell.classList.add('status-bad');
+                    } else {
+                        cell.classList.add('status-good');
+                    }
+
+                    cell.onclick = () => {
+                        selectedDateStr = currentStr;
+                        setTimeout(() => navigateToTab('viewTab'), 150);
+                    };
+                } else {
+                    cell.onclick = () => {
+                        document.getElementById('dateSelect').value = currentStr;
+                        setTimeout(() => navigateToTab('formTab'), 150);
+                    };
+                }
+
+                grid.appendChild(cell);
+            }
+        }
+
+        // DER NEUE, REINE REGISTRIERUNGS-CODE FÜR DIE SEPARATE SW.JS DATEI
+        document.addEventListener("DOMContentLoaded", () => {
+            if(window.location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("Service Worker registriert!"))
+                .catch(err => console.log("Fehler beim SW Registrieren:", err));
+            }
+        });
+
+        function loadDetailView(dateStr) {
+            const entry = JSON.parse(localStorage.getItem('diary_' + dateStr));
+            if (!entry) return;
+
+            document.getElementById('emptyStateMessage').style.display = 'none';
+            document.getElementById('detailContent').style.display = 'block';
+
+            const parts = dateStr.split('-');
+            document.getElementById('viewDate').innerText = `Eintrag vom ${parts[2]}.${parts[1]}.${parts[0]}`;
+            
+            const handy = parseFloat(entry.handyTime || entry.screenTime || 0);
+            const laptop = parseFloat(entry.laptopTime || 0);
+            const totalTime = handy + laptop;
+            
+            document.getElementById('viewScreenTime').innerText = totalTime;
+            document.getElementById('viewScreenTimeSplit').innerText = `Handy: ${handy} Std. | Laptop: ${laptop} Std.`;
+            
+            if (totalTime > 3) {
+                document.getElementById('viewScreenTimeContainer').innerHTML = `${totalTime} Stunden <span class="badge bad">> 3 Std. Limit!</span>`;
+            } else {
+                document.getElementById('viewScreenTimeContainer').innerHTML = `${totalTime} Stunden <span class="badge good">Im Limit</span>`;
+            }
+
+            document.getElementById('viewUnnecessary').innerHTML = entry.unnecessaryScreen === 'Ja' ? '<span class="badge bad">Ja</span>' : '<span class="badge good">Nein</span>';
+            document.getElementById('viewWave').innerHTML = entry.waveOccurred === 'Ja' ? '<span class="badge bad">Ja</span>' : '<span class="badge good">Nein</span>';
+            
+            if (entry.waveOccurred === 'Ja') {
+                document.getElementById('viewResisted').innerHTML = entry.resisted === 'Ja' ? '<span class="badge good">Ja</span>' : '<span class="badge bad">Nein</span>';
+            } else {
+                document.getElementById('viewResisted').innerHTML = '<span>Keine Sucht gespürt</span>';
+            }
+            
+            document.getElementById('viewNotes').innerText = entry.notes || "Keine Notizen erfasst.";
+        }
+    </script>
+</body>
+</html>

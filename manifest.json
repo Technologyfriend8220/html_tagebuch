@@ -1,0 +1,29 @@
+{
+  "id": "./",
+  "scope": "./",
+  "start_url": "./index.html",
+  "name": "Tagebuch",
+  "short_name": "Tagebuch",
+  "description": "Minimalistisches persönliches Tagebuch im Homescreen-Design",
+  "lang": "de",
+  "dir": "ltr",
+  "theme_color": "#121212",
+  "background_color": "#121212",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["lifestyle", "productivity"],
+  "icons": [
+    {
+      "src": "./logo.jpg",
+      "sizes": "350x350",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
